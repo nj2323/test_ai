@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataStats Pro - 원클릭 데이터 분석 대시보드</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- SheetJS (xlsx) for 100% Client-Side Excel Parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- Plotly.js for Professional Statistical & Scientific Charting -->
+  <script src="https://cdn.plot.ly/plotly-2.30.0.min.js"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="css/style.css">
+  
+  <!-- Tailwind Config -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col">
+
+  <!-- TOP HEADER -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <!-- Logo & Title -->
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-md">
+            <i data-lucide="bar-chart-3" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <h1 class="text-xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+              DataStats Pro
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">v1.0</span>
+            </h1>
+            <p class="text-xs text-slate-500">원클릭 실시간 통계분석 & 데이터 대시보드</p>
+          </div>
+        </div>
+
+        <!-- Security Badge & Action Buttons -->
+        <div class="flex items-center space-x-3">
+          <!-- 100% In-Memory Badge -->
+          <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-badge"></span>
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>100% 클라이언트 메모리 보안 처리</span>
+          </div>
+
+          <!-- Load Dummy Data Button -->
+          <button id="btnLoadDummy" class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-medium rounded-lg transition-colors border border-indigo-200 shadow-sm">
+            <i data-lucide="database" class="w-4 h-4"></i>
+            <span>더미 데이터 로드</span>
+          </button>
+
+          <!-- File Upload Button -->
+          <label class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg cursor-pointer transition-colors shadow-sm">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <span>엑셀/CSV 업로드</span>
+            <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" class="hidden">
+          </label>
+
+          <!-- Print / PDF Report Button -->
+          <button id="btnPrintReport" class="hidden md:inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg border border-slate-300 transition-colors shadow-sm">
+            <i data-lucide="printer" class="w-4 h-4"></i>
+            <span>리포트 인쇄</span>
+          </button>
+
+          <!-- Export Clean CSV -->
+          <button id="btnExportCsv" class="hidden md:inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg border border-slate-300 transition-colors shadow-sm">
+            <i data-lucide="download" class="w-4 h-4"></i>
+            <span>CSV 저장</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- DRAG & DROP ZONE (COLLAPSIBLE OR EMPTY STATE) -->
+  <div id="dropZone" class="hidden max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-4">
+    <div class="border-2 border-dashed border-slate-300 hover:border-indigo-500 rounded-2xl p-6 text-center bg-white transition-all cursor-pointer">
+      <i data-lucide="file-spreadsheet" class="w-12 h-12 text-slate-400 mx-auto mb-2"></i>
+      <p class="text-sm font-medium text-slate-700">엑셀(.xlsx, .xls) 또는 CSV 파일을 이곳에 드래그하거나 클릭하여 업로드하세요</p>
+      <p class="text-xs text-slate-400 mt-1">파일은 외부 서버로 전송되지 않고 브라우저 메모리 내에서 안전하게 즉시 분석됩니다.</p>
+    </div>
+  </div>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col space-y-6">
+
+    <!-- DATASET SUMMARY STATUS BAR -->
+    <div class="bg-white rounded-xl p-4 card-shadow flex flex-wrap items-center justify-between gap-4 border border-slate-200">
+      <div class="flex items-center space-x-3">
+        <div class="p-2.5 rounded-lg bg-indigo-50 text-indigo-600">
+          <i data-lucide="file-check-2" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="metaFileName" class="text-sm font-bold text-slate-800">dummy_sensor_data.xlsx</span>
+            <span id="metaSheetName" class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600">측정 데이터</span>
+          </div>
+          <p id="metaDataInfo" class="text-xs text-slate-500 mt-0.5">총 100개 관측치 · 6개 수치형 변수 · 하단 요약행 자동 정제 완료</p>
+        </div>
+      </div>
+
+      <!-- Quick Numeric Column Badges -->
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="text-xs text-slate-400 font-medium mr-1">분석 변수:</span>
+        <div id="columnBadges" class="flex flex-wrap gap-1.5">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB NAVIGATION -->
+    <div class="border-b border-slate-200 bg-white rounded-t-xl px-4 pt-2 shadow-xs flex items-center justify-between overflow-x-auto no-scrollbar">
+      <div class="flex space-x-1 sm:space-x-4 min-w-max" id="tabNav">
+        <button data-tab="tab-overview" class="tab-btn active inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 transition-colors">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>1. 종합 기술통계</span>
+        </button>
+        <button data-tab="tab-distribution" class="tab-btn inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 text-slate-600 hover:text-slate-900 border-transparent transition-colors">
+          <i data-lucide="bar-chart-2" class="w-4 h-4"></i>
+          <span>2. 분포 & 정규성</span>
+        </button>
+        <button data-tab="tab-correlation" class="tab-btn inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 text-slate-600 hover:text-slate-900 border-transparent transition-colors">
+          <i data-lucide="git-commit" class="w-4 h-4"></i>
+          <span>3. 상관관계 분석</span>
+        </button>
+        <button data-tab="tab-regression" class="tab-btn inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 text-slate-600 hover:text-slate-900 border-transparent transition-colors">
+          <i data-lucide="trending-up" class="w-4 h-4"></i>
+          <span>4. 회귀 & 잔차 분석</span>
+        </button>
+        <button data-tab="tab-hypothesis" class="tab-btn inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 text-slate-600 hover:text-slate-900 border-transparent transition-colors">
+          <i data-lucide="flask-conical" class="w-4 h-4"></i>
+          <span>5. 통계적 가설 검정</span>
+        </button>
+        <button data-tab="tab-spc" class="tab-btn inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 text-slate-600 hover:text-slate-900 border-transparent transition-colors">
+          <i data-lucide="activity" class="w-4 h-4"></i>
+          <span>6. 공정품질 & 이상치(SPC)</span>
+        </button>
+        <button data-tab="tab-raw" class="tab-btn inline-flex items-center gap-2 py-3 px-3.5 text-sm font-medium border-b-2 text-slate-600 hover:text-slate-900 border-transparent transition-colors">
+          <i data-lucide="table" class="w-4 h-4"></i>
+          <span>7. 원본 데이터</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         TAB 1: 종합 기술통계 (Overview & Descriptive Stats)
+         ========================================== -->
+    <section id="tab-overview" class="tab-content block space-y-6">
+      <!-- Quick KPI Cards Grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4" id="kpiCardsContainer">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <!-- Comprehensive Descriptive Table -->
+      <div class="bg-white rounded-xl card-shadow border border-slate-200 overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="file-text" class="w-5 h-5 text-indigo-600"></i>
+            <h2 class="text-base font-bold text-slate-900">전체 수치형 변수 종합 기술통계량 비교</h2>
+          </div>
+          <span class="text-xs text-slate-400">표본 표준편차(s) 및 Fisher 첨도 기준</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm data-table" id="descStatsTable">
+            <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 text-xs uppercase tracking-wider">
+              <tr>
+                <th class="px-4 py-3">변수명 (Variable)</th>
+                <th class="px-3 py-3 text-right">관측치 (N)</th>
+                <th class="px-3 py-3 text-right">평균 (Mean)</th>
+                <th class="px-3 py-3 text-right">표준편차 (Std)</th>
+                <th class="px-3 py-3 text-right">중앙값 (Median)</th>
+                <th class="px-3 py-3 text-right">최솟값 (Min)</th>
+                <th class="px-3 py-3 text-right">제1사분위 (Q1)</th>
+                <th class="px-3 py-3 text-right">제3사분위 (Q3)</th>
+                <th class="px-3 py-3 text-right">최댓값 (Max)</th>
+                <th class="px-3 py-3 text-right">사분위범위 (IQR)</th>
+                <th class="px-3 py-3 text-right">왜도 (Skewness)</th>
+                <th class="px-3 py-3 text-right">첨도 (Kurtosis)</th>
+                <th class="px-3 py-3 text-right">변동계수 (CV%)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono text-xs">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Quick Overview Multi-Box Plot Chart -->
+      <div class="bg-white rounded-xl card-shadow border border-slate-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="boxes" class="w-5 h-5 text-indigo-600"></i>
+            <h3 class="text-base font-bold text-slate-900">수치 변수별 정규화 비교 (Z-Score Standardized Box Plots)</h3>
+          </div>
+          <span class="text-xs text-slate-500">각 변수를 Z-score로 정규화하여 스케일 차이 없이 분포와 이상치를 한눈에 비교</span>
+        </div>
+        <div id="chartOverviewBox" class="chart-container"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 2: 데이터 분포 & 정규성 (Distribution & Normality)
+         ========================================== -->
+    <section id="tab-distribution" class="tab-content hidden space-y-6">
+      <!-- Variable Selector Toolbar -->
+      <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <label class="text-sm font-semibold text-slate-700">분석 대상 변수:</label>
+          <select id="distVarSelect" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <!-- Rendered dynamically -->
+          </select>
+        </div>
+        <!-- Normality Verdict Pill -->
+        <div id="distNormalityBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Distribution Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Histogram with Normal Fit Overlay -->
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
+              히스토그램 & 정규분포 적합 곡선
+            </h3>
+            <span class="text-xs text-slate-400">Histogram + Gaussian Curve</span>
+          </div>
+          <div id="chartDistHist" class="chart-container"></div>
+        </div>
+
+        <!-- Box Plot & Violin -->
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="sliders" class="w-4 h-4 text-indigo-600"></i>
+              박스 플롯 & 사분위수(IQR)
+            </h3>
+            <span class="text-xs text-slate-400">Box & Whisker Plot</span>
+          </div>
+          <div id="chartDistBox" class="chart-container"></div>
+        </div>
+
+        <!-- Q-Q Plot (Normal Quantile-Quantile) -->
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="spline" class="w-4 h-4 text-indigo-600"></i>
+              Q-Q 플롯 (정규 분위수 대조도)
+            </h3>
+            <span class="text-xs text-slate-400">대각선에 가까울수록 정규분포 만족</span>
+          </div>
+          <div id="chartDistQQ" class="chart-container"></div>
+        </div>
+
+        <!-- Normality Statistics Summary Card -->
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="check-circle-2" class="w-4 h-4 text-indigo-600"></i>
+                Jarque-Bera 정규성 검정 및 형상 지수
+              </h3>
+              <span class="text-xs text-slate-400">유의수준 α = 0.05</span>
+            </div>
+            <div class="space-y-3 mt-4" id="distStatsDetails">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+          <div class="mt-6 p-4 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+            <p class="font-semibold text-slate-800">💡 정규성 판정 해석 기준:</p>
+            <p>• <strong>Jarque-Bera p-value ≥ 0.05</strong>: 정규분포를 따른다는 귀무가설(H₀)을 기각할 수 없음 (정규성 만족).</p>
+            <p>• <strong>왜도(Skewness)</strong>: 0에 가까우면 대칭, 양수이면 오른쪽 꼬리가 김, 음수이면 왼쪽 꼬리가 김.</p>
+            <p>• <strong>첨도(Kurtosis)</strong>: 0에 가까우면 표준 정규, 양수이면 뾰족하고 두꺼운 꼬리, 음수이면 완만한 분포.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 3: 상관관계 분석 (Correlation & Heatmap)
+         ========================================== -->
+    <section id="tab-correlation" class="tab-content hidden space-y-6">
+      <!-- Correlation Method & Options Toolbar -->
+      <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <label class="text-sm font-semibold text-slate-700">상관분석 기법:</label>
+          <div class="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50">
+            <button id="btnMethodPearson" class="px-3 py-1.5 rounded-md text-xs font-semibold bg-white text-indigo-700 shadow-xs border border-indigo-100">
+              피어슨(Pearson) 선형 상관
+            </button>
+            <button id="btnMethodSpearman" class="px-3 py-1.5 rounded-md text-xs font-medium text-slate-600 hover:text-slate-900">
+              스피어만(Spearman) 순위 상관
+            </button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <span class="text-xs text-slate-500">산점도 대조 변수:</span>
+          <select id="corrVarX" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-1 focus:ring-indigo-500"></select>
+          <span class="text-xs text-slate-400">vs</span>
+          <select id="corrVarY" class="bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium focus:ring-1 focus:ring-indigo-500"></select>
+        </div>
+      </div>
+
+      <!-- Charts Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Heatmap (7 cols) -->
+        <div class="lg:col-span-7 bg-white p-5 rounded-xl card-shadow border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="grid" class="w-4 h-4 text-indigo-600"></i>
+              상관계수 매트릭스 히트맵 (Correlation Heatmap)
+            </h3>
+            <span id="corrMethodLabel" class="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded">Pearson r</span>
+          </div>
+          <div id="chartCorrHeatmap" class="chart-container"></div>
+        </div>
+
+        <!-- Scatter Plot & Correlation KPI (5 cols) -->
+        <div class="lg:col-span-5 bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="scatter-chart" class="w-4 h-4 text-indigo-600"></i>
+                선택 변수 2변량 산점도 & 추세선
+              </h3>
+              <span id="corrValueBadge" class="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">r = 0.00</span>
+            </div>
+            <div id="chartCorrScatter" class="chart-container" style="min-height: 340px;"></div>
+          </div>
+
+          <div id="corrInterpretationBox" class="mt-4 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600">
+            <!-- Dynamic text -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 4: 회귀 분석 & 잔차 (Regression Analysis)
+         ========================================== -->
+    <section id="tab-regression" class="tab-content hidden space-y-6">
+      <!-- Regression Controls Toolbar -->
+      <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center flex-wrap gap-4">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-700">독립변수 (X):</label>
+            <select id="regVarX" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-indigo-500"></select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-700">종속변수 (Y):</label>
+            <select id="regVarY" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-indigo-500"></select>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-700">모델 차수:</label>
+            <div class="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50">
+              <button id="btnRegLinear" class="px-2.5 py-1 rounded text-xs font-semibold bg-white text-indigo-700 shadow-xs">단순 선형 (1차)</button>
+              <button id="btnRegPoly2" class="px-2.5 py-1 rounded text-xs font-medium text-slate-600 hover:text-slate-900">다항 회귀 (2차)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Regression Formula Card -->
+        <div class="flex items-center gap-2 bg-indigo-50 px-3.5 py-1.5 rounded-lg border border-indigo-200 text-indigo-900">
+          <span class="text-xs font-semibold">회귀 모델식:</span>
+          <code id="regFormulaText" class="text-xs font-bold font-mono text-indigo-700">y = ax + b</code>
+        </div>
+      </div>
+
+      <!-- Regression KPI Cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="regKpiGrid">
+        <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">결정계수 (R²)</p>
+          <p id="regR2" class="text-2xl font-black text-indigo-600 font-mono mt-1">0.0000</p>
+          <p class="text-[11px] text-slate-400 mt-1">설명력 (Variance Explained)</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">조정 결정계수 (Adj. R²)</p>
+          <p id="regAdjR2" class="text-2xl font-black text-slate-800 font-mono mt-1">0.0000</p>
+          <p class="text-[11px] text-slate-400 mt-1">자유도 보정 설명력</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">평균제곱근오차 (RMSE)</p>
+          <p id="regRmse" class="text-2xl font-black text-slate-800 font-mono mt-1">0.0000</p>
+          <p class="text-[11px] text-slate-400 mt-1">표준 예측 오차</p>
+        </div>
+        <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200">
+          <p class="text-xs font-medium text-slate-500">기울기 유의확률 (p-value)</p>
+          <p id="regPVal" class="text-2xl font-black text-emerald-600 font-mono mt-1">&lt; 0.001</p>
+          <p id="regSignificanceBadge" class="text-[11px] font-semibold text-emerald-600 mt-1">통계적으로 유의미함</p>
+        </div>
+      </div>
+
+      <!-- Regression Main Plot & Residual Plot Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Main Fitted Line Plot -->
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="line-chart" class="w-4 h-4 text-indigo-600"></i>
+              회귀 적합선 & 관측 데이터 산점도
+            </h3>
+            <span class="text-xs text-slate-400">Observed vs Fitted Line</span>
+          </div>
+          <div id="chartRegMain" class="chart-container"></div>
+        </div>
+
+        <!-- Residuals vs Fitted Plot -->
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="git-pull-request" class="w-4 h-4 text-indigo-600"></i>
+              잔차 분석 (Residuals vs Fitted)
+            </h3>
+            <span class="text-xs text-slate-400">잔차의 무작위성 및 등분산성 진단</span>
+          </div>
+          <div id="chartRegResiduals" class="chart-container"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 5: 통계적 가설 검정 (Hypothesis Testing)
+         ========================================== -->
+    <section id="tab-hypothesis" class="tab-content hidden space-y-6">
+      <!-- Hypothesis Sub-Tab Bar -->
+      <div class="bg-white p-2 rounded-xl card-shadow border border-slate-200 flex space-x-2">
+        <button id="subtab-t1-btn" class="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 transition-colors">
+          단일표본 t-검정 (One-sample t-test)
+        </button>
+        <button id="subtab-t2-btn" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
+          독립 2표본 t-검정 (Two-sample t-test)
+        </button>
+        <button id="subtab-anova-btn" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors">
+          일원배치 분산분석 (One-way ANOVA)
+        </button>
+      </div>
+
+      <!-- Sub-Tab 1: One-Sample t-test -->
+      <div id="subtab-t1-panel" class="space-y-6">
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-bold text-slate-700">검정 대상 변수:</label>
+              <select id="ttest1Var" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold"></select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-bold text-slate-700">기준 검정값 (μ₀):</label>
+              <input type="number" id="ttest1Mu" value="50" step="any" class="w-28 bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-mono font-semibold">
+            </div>
+            <button id="btnRunTTest1" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm">
+              검정 실행
+            </button>
+          </div>
+          <!-- Hypothesis summary pill -->
+          <div class="text-xs text-slate-500 font-mono bg-slate-50 px-3 py-1 rounded-md border border-slate-200">
+            H₀: μ = μ₀ &nbsp;|&nbsp; H₁: μ ≠ μ₀ (α = 0.05)
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-1 bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between" id="ttest1ResultCard">
+            <!-- Rendered dynamically -->
+          </div>
+          <div class="lg:col-span-2 bg-white p-5 rounded-xl card-shadow border border-slate-200">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-slate-900">표본 평균 vs 검정 기준값 분포 시각화</h3>
+              <span class="text-xs text-slate-400">Sample Mean & 95% Confidence Interval</span>
+            </div>
+            <div id="chartTTest1" class="chart-container" style="min-height: 340px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-Tab 2: Two-Sample t-test -->
+      <div id="subtab-t2-panel" class="hidden space-y-6">
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-bold text-slate-700">집단 1 변수 (Sample A):</label>
+              <select id="ttest2VarA" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold"></select>
+            </div>
+            <div class="flex items-center gap-2">
+              <label class="text-xs font-bold text-slate-700">집단 2 변수 (Sample B):</label>
+              <select id="ttest2VarB" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold"></select>
+            </div>
+            <button id="btnRunTTest2" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm">
+              검정 실행
+            </button>
+          </div>
+          <div class="text-xs text-slate-500 font-mono bg-slate-50 px-3 py-1 rounded-md border border-slate-200">
+            H₀: μ₁ = μ₂ &nbsp;|&nbsp; Welch's t-test (등분산 가정 배제)
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-1 bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between" id="ttest2ResultCard">
+            <!-- Rendered dynamically -->
+          </div>
+          <div class="lg:col-span-2 bg-white p-5 rounded-xl card-shadow border border-slate-200">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-slate-900">두 집단 간 평균 비교 및 밀도 곡선</h3>
+              <span class="text-xs text-slate-400">Two Groups Comparison</span>
+            </div>
+            <div id="chartTTest2" class="chart-container" style="min-height: 340px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sub-Tab 3: One-Way ANOVA -->
+      <div id="subtab-anova-panel" class="hidden space-y-6">
+        <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <span class="text-xs font-bold text-slate-700">ANOVA 비교 대상 수치 변수 선택:</span>
+            <div id="anovaVarCheckboxes" class="flex flex-wrap gap-2">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+          <button id="btnRunAnova" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg shadow-sm">
+            분산분석 실행
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-1 bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between" id="anovaResultCard">
+            <!-- Rendered dynamically -->
+          </div>
+          <div class="lg:col-span-2 bg-white p-5 rounded-xl card-shadow border border-slate-200">
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="text-sm font-bold text-slate-900">집단별 평균 및 오차 막대 비교 (Mean & Error Bars)</h3>
+              <span class="text-xs text-slate-400">ANOVA Comparison Plot</span>
+            </div>
+            <div id="chartAnova" class="chart-container" style="min-height: 340px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 6: 공정품질 & 이상치 (SPC & Control Chart)
+         ========================================== -->
+    <section id="tab-spc" class="tab-content hidden space-y-6">
+      <!-- SPC Controls Toolbar -->
+      <div class="bg-white p-4 rounded-xl card-shadow border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="flex items-center gap-2">
+            <label class="text-xs font-bold text-slate-700">관리 대상 센서 변수:</label>
+            <select id="spcVarSelect" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs font-semibold"></select>
+          </div>
+          <!-- SMA Checkboxes -->
+          <div class="flex items-center gap-3 text-xs">
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkSma5" checked class="rounded text-indigo-600 focus:ring-indigo-500">
+              <span class="font-medium text-slate-700">5점 이동평균 (SMA 5)</span>
+            </label>
+            <label class="inline-flex items-center gap-1.5 cursor-pointer">
+              <input type="checkbox" id="chkSma20" checked class="rounded text-indigo-600 focus:ring-indigo-500">
+              <span class="font-medium text-slate-700">20점 이동평균 (SMA 20)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- SPC Quick Legend Badges -->
+        <div class="flex items-center gap-2 text-[11px] font-medium flex-wrap">
+          <span class="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">UCL (+3σ)</span>
+          <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">UWL (+2σ)</span>
+          <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">CL (Mean)</span>
+          <span class="px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">LWL (-2σ)</span>
+          <span class="px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">LCL (-3σ)</span>
+        </div>
+      </div>
+
+      <!-- Main SPC Chart -->
+      <div class="bg-white p-5 rounded-xl card-shadow border border-slate-200">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <i data-lucide="activity" class="w-5 h-5 text-indigo-600"></i>
+            <h3 class="text-sm font-bold text-slate-900">슈하트 공정 관리도 (Shewhart Individual Control Chart)</h3>
+          </div>
+          <span id="spcOutlierSummaryBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+            이상치 없음 (정상 공정)
+          </span>
+        </div>
+        <div id="chartSpcMain" class="chart-container" style="min-height: 440px;"></div>
+      </div>
+
+      <!-- Outliers & Western Electric Rules Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <!-- Outlier Log Table (7 cols) -->
+        <div class="lg:col-span-7 bg-white rounded-xl card-shadow border border-slate-200 overflow-hidden">
+          <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-600"></i>
+              감지된 관리 한계 초과 및 통계적 이상치 목록
+            </h4>
+            <span class="text-xs text-slate-400">3-Sigma & IQR Rule</span>
+          </div>
+          <div class="overflow-x-auto max-h-72">
+            <table class="w-full text-left text-xs" id="spcOutlierTable">
+              <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                <tr>
+                  <th class="px-3 py-2.5">행 번호</th>
+                  <th class="px-3 py-2.5">시각 / 타임스탬프</th>
+                  <th class="px-3 py-2.5 text-right">측정값</th>
+                  <th class="px-3 py-2.5 text-right">관리선(UCL/LCL) 대비</th>
+                  <th class="px-3 py-2.5 text-center">감지 규칙</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 font-mono">
+                <!-- Rendered dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SPC Stats & Limits Summary (5 cols) -->
+        <div class="lg:col-span-5 bg-white p-5 rounded-xl card-shadow border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h4 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-indigo-600"></i>
+              공정 관리 한계선(Control Limits) 수치
+            </h4>
+            <div class="space-y-2.5 text-xs font-mono" id="spcLimitsContainer">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <div class="mt-4 p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+            <p class="font-bold text-slate-800">💡 SPC 해석 가이드:</p>
+            <p>• <strong>±3σ 관리한계(UCL/LCL)</strong>를 벗어난 점은 우연원인이 아닌 '이상원인(Special Cause)'에 의한 변동으로 간주되어 공정 점검이 필요합니다.</p>
+            <p>• <strong>이동평균선(SMA)</strong>을 통해 센서의 단기 노이즈를 필터링하고 공정의 전반적인 드리프트(Drift) 추세를 파악할 수 있습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================
+         TAB 7: 원본 데이터 테이블 (Raw Data View)
+         ========================================== -->
+    <section id="tab-raw" class="tab-content hidden space-y-4">
+      <div class="bg-white rounded-xl card-shadow border border-slate-200 overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="database" class="w-5 h-5 text-indigo-600"></i>
+            <h2 class="text-base font-bold text-slate-900">정제된 원본 데이터 뷰어 (In-Memory Table)</h2>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="rawRowCountLabel" class="text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700">총 100행 로드됨</span>
+          </div>
+        </div>
+        <div class="data-table-container">
+          <table class="w-full text-left text-xs data-table" id="rawDataTable">
+            <thead class="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200" id="rawDataTableHead">
+              <!-- Rendered dynamically -->
+            </thead>
+            <tbody class="divide-y divide-slate-100 font-mono" id="rawDataTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-700">DataStats Pro</span>
+        <span>·</span>
+        <span>클라이언트 메모리 전용 통계분석 대시보드</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span>No Build Framework · Pure HTML/CSS/JS</span>
+        <span>·</span>
+        <span class="text-emerald-600 font-medium">Data Privacy Guaranteed (0 Bytes Network Transmission)</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/sample-data.js"></script>
+  <script src="js/stats-engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
